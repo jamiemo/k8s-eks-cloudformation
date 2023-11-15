@@ -1,0 +1,934 @@
+{
+  "Description": "This deploys an EKS cluster with associated add-ons, roles and policies.",
+  "Parameters": {
+      "EnvironmentName": {
+          "Description": "An environment name that is added to resource names",
+          "Type": "String",
+          "Default": "dev",
+          "AllowedValues": [
+              "dev",
+              "uat",
+              "prod"
+          ]
+      },
+      "VpcPrefix": {
+          "Description": "Please enter the IP range prefix for this VPC. e.g. 10.10",
+          "Type": "String",
+          "Default": "10.10"
+      },
+      "ProjectName": {
+          "Description": "Please enter the project name.",
+          "Type": "String",
+          "AllowedPattern": "[a-zA-Z0-9]*",
+          "MinLength": "3",
+          "ConstraintDescription": "Must contain only alphanumeric characters."
+      },
+      "OIDCThumbprint": {
+          "Description": "Starfield Technologies, Inc. certificate authority thumbprint. Expires 06/29/2034.",
+          "Type": "String",
+          "MinLength": "40",
+          "MaxLength": "40",
+          "Default": "9e99a48a9960b14926bb7f3b02e22da2b0ab7280"
+      }
+  },
+  "Resources": {
+      "VPC": {
+          "Type": "AWS::EC2::VPC",
+          "Properties": {
+              "CidrBlock": {
+                  "Fn::Join": [
+                      "",
+                      [
+                          {
+                              "Ref": "VpcPrefix"
+                          },
+                          ".0.0/16"
+                      ]
+                  ]
+              },
+              "EnableDnsSupport": true,
+              "EnableDnsHostnames": true,
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": {
+                          "Fn::Sub": "${ProjectName}-${EnvironmentName}"
+                      }
+                  },
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "InternetGateway": {
+          "Type": "AWS::EC2::InternetGateway",
+          "Properties": {
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "InternetGatewayAttachment": {
+          "Type": "AWS::EC2::VPCGatewayAttachment",
+          "Properties": {
+              "InternetGatewayId": {
+                  "Ref": "InternetGateway"
+              },
+              "VpcId": {
+                  "Ref": "VPC"
+              }
+          }
+      },
+      "NatGatewayEIP": {
+          "Type": "AWS::EC2::EIP",
+          "DependsOn": "InternetGatewayAttachment",
+          "Properties": {
+              "Domain": "vpc",
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "NatGateway": {
+          "Type": "AWS::EC2::NatGateway",
+          "Properties": {
+              "AllocationId": {
+                  "Fn::GetAtt": [
+                      "NatGatewayEIP",
+                      "AllocationId"
+                  ]
+              },
+              "SubnetId": {
+                  "Ref": "PublicSubnet1"
+              },
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "PublicSubnet1": {
+          "Type": "AWS::EC2::Subnet",
+          "Properties": {
+              "VpcId": {
+                  "Ref": "VPC"
+              },
+              "AvailabilityZone": {
+                  "Fn::Select": [
+                      0,
+                      {
+                          "Fn::GetAZs": ""
+                      }
+                  ]
+              },
+              "CidrBlock": {
+                  "Fn::Join": [
+                      "",
+                      [
+                          {
+                              "Ref": "VpcPrefix"
+                          },
+                          ".16.0/20"
+                      ]
+                  ]
+              },
+              "MapPublicIpOnLaunch": true,
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": {
+                          "Fn::Sub": "${ProjectName}-${EnvironmentName} Public Subnet (AZ1)"
+                      }
+                  },
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "PublicSubnet2": {
+          "Type": "AWS::EC2::Subnet",
+          "Properties": {
+              "VpcId": {
+                  "Ref": "VPC"
+              },
+              "AvailabilityZone": {
+                  "Fn::Select": [
+                      1,
+                      {
+                          "Fn::GetAZs": ""
+                      }
+                  ]
+              },
+              "CidrBlock": {
+                  "Fn::Join": [
+                      "",
+                      [
+                          {
+                              "Ref": "VpcPrefix"
+                          },
+                          ".32.0/20"
+                      ]
+                  ]
+              },
+              "MapPublicIpOnLaunch": true,
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": {
+                          "Fn::Sub": "${ProjectName}-${EnvironmentName} Public Subnet (AZ2)"
+                      }
+                  },
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "PrivateSubnet1": {
+          "Type": "AWS::EC2::Subnet",
+          "Properties": {
+              "VpcId": {
+                  "Ref": "VPC"
+              },
+              "AvailabilityZone": {
+                  "Fn::Select": [
+                      0,
+                      {
+                          "Fn::GetAZs": ""
+                      }
+                  ]
+              },
+              "CidrBlock": {
+                  "Fn::Join": [
+                      "",
+                      [
+                          {
+                              "Ref": "VpcPrefix"
+                          },
+                          ".112.0/20"
+                      ]
+                  ]
+              },
+              "MapPublicIpOnLaunch": false,
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": {
+                          "Fn::Sub": "${ProjectName}-${EnvironmentName} Private Subnet (AZ1)"
+                      }
+                  },
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "PrivateSubnet2": {
+          "Type": "AWS::EC2::Subnet",
+          "Properties": {
+              "VpcId": {
+                  "Ref": "VPC"
+              },
+              "AvailabilityZone": {
+                  "Fn::Select": [
+                      1,
+                      {
+                          "Fn::GetAZs": ""
+                      }
+                  ]
+              },
+              "CidrBlock": {
+                  "Fn::Join": [
+                      "",
+                      [
+                          {
+                              "Ref": "VpcPrefix"
+                          },
+                          ".128.0/20"
+                      ]
+                  ]
+              },
+              "MapPublicIpOnLaunch": false,
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": {
+                          "Fn::Sub": "${ProjectName}-${EnvironmentName} Private Subnet (AZ2)"
+                      }
+                  },
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "PublicRouteTable": {
+          "Type": "AWS::EC2::RouteTable",
+          "Properties": {
+              "VpcId": {
+                  "Ref": "VPC"
+              },
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": {
+                          "Fn::Sub": "${ProjectName}-${EnvironmentName} Public Routes"
+                      }
+                  },
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "DefaultPublicRoute": {
+          "Type": "AWS::EC2::Route",
+          "DependsOn": "InternetGatewayAttachment",
+          "Properties": {
+              "RouteTableId": {
+                  "Ref": "PublicRouteTable"
+              },
+              "DestinationCidrBlock": "0.0.0.0/0",
+              "GatewayId": {
+                  "Ref": "InternetGateway"
+              }
+          }
+      },
+      "PublicSubnet1RouteTableAssociation": {
+          "Type": "AWS::EC2::SubnetRouteTableAssociation",
+          "Properties": {
+              "RouteTableId": {
+                  "Ref": "PublicRouteTable"
+              },
+              "SubnetId": {
+                  "Ref": "PublicSubnet1"
+              }
+          }
+      },
+      "PublicSubnet2RouteTableAssociation": {
+          "Type": "AWS::EC2::SubnetRouteTableAssociation",
+          "Properties": {
+              "RouteTableId": {
+                  "Ref": "PublicRouteTable"
+              },
+              "SubnetId": {
+                  "Ref": "PublicSubnet2"
+              }
+          }
+      },
+      "PrivateRouteTable": {
+          "Type": "AWS::EC2::RouteTable",
+          "Properties": {
+              "VpcId": {
+                  "Ref": "VPC"
+              },
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": {
+                          "Fn::Sub": "${ProjectName}-${EnvironmentName} Private Routes (AZ1)"
+                      }
+                  },
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "DefaultPrivateRoute": {
+          "Type": "AWS::EC2::Route",
+          "Properties": {
+              "RouteTableId": {
+                  "Ref": "PrivateRouteTable"
+              },
+              "DestinationCidrBlock": "0.0.0.0/0",
+              "NatGatewayId": {
+                  "Ref": "NatGateway"
+              }
+          }
+      },
+      "PrivateSubnet1RouteTableAssociation": {
+          "Type": "AWS::EC2::SubnetRouteTableAssociation",
+          "Properties": {
+              "RouteTableId": {
+                  "Ref": "PrivateRouteTable"
+              },
+              "SubnetId": {
+                  "Ref": "PrivateSubnet1"
+              }
+          }
+      },
+      "PrivateSubnet2RouteTableAssociation": {
+          "Type": "AWS::EC2::SubnetRouteTableAssociation",
+          "Properties": {
+              "RouteTableId": {
+                  "Ref": "PrivateRouteTable"
+              },
+              "SubnetId": {
+                  "Ref": "PrivateSubnet2"
+              }
+          }
+      },
+      "NoIngressSecurityGroup": {
+          "Type": "AWS::EC2::SecurityGroup",
+          "Properties": {
+              "GroupName": "no-ingress-sg",
+              "GroupDescription": "Security group with no ingress rule",
+              "VpcId": {
+                  "Ref": "VPC"
+              }
+          }
+      },
+      "ContainerRepository": {
+          "Type": "AWS::ECR::Repository",
+          "Properties": {
+              "RepositoryName": {
+                  "Fn::Sub": "${ProjectName}-${EnvironmentName}"
+              },
+              "ImageScanningConfiguration": {
+                  "ScanOnPush": true
+              },
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "EKSIAMRole": {
+          "Type": "AWS::IAM::Role",
+          "Properties": {
+              "AssumeRolePolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                      {
+                          "Effect": "Allow",
+                          "Principal": {
+                              "Service": "eks.amazonaws.com"
+                          },
+                          "Action": "sts:AssumeRole"
+                      }
+                  ]
+              },
+              "RoleName": {
+                  "Fn::Sub": "${ProjectName}-${EnvironmentName}"
+              },
+              "ManagedPolicyArns": [
+                  "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+                  "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+              ],
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "ControlPlaneSecurityGroup": {
+          "Type": "AWS::EC2::SecurityGroup",
+          "Properties": {
+              "GroupDescription": "Cluster communication with worker nodes",
+              "VpcId": {
+                  "Ref": "VPC"
+              },
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "EKSCluster": {
+          "Type": "AWS::EKS::Cluster",
+          "Properties": {
+              "Name": {
+                  "Fn::Sub": "${ProjectName}-${EnvironmentName}"
+              },
+              "RoleArn": {
+                  "Fn::GetAtt": [
+                      "EKSIAMRole",
+                      "Arn"
+                  ]
+              },
+              "ResourcesVpcConfig": {
+                  "SecurityGroupIds": [
+                      {
+                          "Ref": "ControlPlaneSecurityGroup"
+                      }
+                  ],
+                  "SubnetIds": [
+                      {
+                          "Ref": "PrivateSubnet1"
+                      },
+                      {
+                          "Ref": "PrivateSubnet2"
+                      }
+                  ]
+              },
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          },
+          "DependsOn": [
+              "EKSIAMRole",
+              "PrivateSubnet1",
+              "PrivateSubnet2",
+              "ControlPlaneSecurityGroup"
+          ]
+      },
+      "OIDCProvider": {
+          "Type": "AWS::IAM::OIDCProvider",
+          "Properties": {
+              "ClientIdList": [
+                  "sts.amazonaws.com"
+              ],
+              "ThumbprintList": [
+                  {
+                      "Ref": "OIDCThumbprint"
+                  }
+              ],
+              "Url": {
+                  "Fn::GetAtt": [
+                      "EKSCluster",
+                      "OpenIdConnectIssuerUrl"
+                  ]
+              }
+          }
+      },
+      "NodeInstanceRole": {
+          "Type": "AWS::IAM::Role",
+          "Properties": {
+              "AssumeRolePolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                      {
+                          "Effect": "Allow",
+                          "Principal": {
+                              "Service": [
+                                  "ec2.amazonaws.com"
+                              ]
+                          },
+                          "Action": [
+                              "sts:AssumeRole"
+                          ]
+                      }
+                  ]
+              },
+              "ManagedPolicyArns": [
+                  "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+                  "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+                  "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+              ],
+              "Path": "/",
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "NodeInstanceProfile": {
+          "Type": "AWS::IAM::InstanceProfile",
+          "Properties": {
+              "Path": "/",
+              "Roles": [
+                  {
+                      "Ref": "NodeInstanceRole"
+                  }
+              ]
+          }
+      },
+      "ManagedNodegroup": {
+          "Type": "AWS::EKS::Nodegroup",
+          "Properties": {
+              "ClusterName": {
+                  "Ref": "EKSCluster"
+              },
+              "NodegroupName": {
+                  "Fn::Sub": "${ProjectName}-${EnvironmentName}-baseload"
+              },
+              "NodeRole": {
+                  "Fn::GetAtt": [
+                      "NodeInstanceRole",
+                      "Arn"
+                  ]
+              },
+              "InstanceTypes": [
+                  "t3.small"
+              ],
+              "ScalingConfig": {
+                  "MinSize": 1,
+                  "DesiredSize": 2,
+                  "MaxSize": 3
+              },
+              "Labels": {
+                  "Name": {
+                      "Fn::Sub": "${ProjectName}-${EnvironmentName}-Node"
+                  },
+                  "Environment": {
+                      "Ref": "EnvironmentName"
+                  },
+                  "Project": {
+                      "Ref": "ProjectName"
+                  }
+              },
+              "Subnets": [
+                  {
+                      "Ref": "PrivateSubnet1"
+                  },
+                  {
+                      "Ref": "PrivateSubnet2"
+                  }
+              ]
+          }
+      },
+      "EBSCSIRole": {
+          "Type": "AWS::IAM::Role",
+          "Properties": {
+              "RoleName": {
+                  "Fn::Sub": "${ProjectName}-${EnvironmentName}-irsa-aws-ebs-csi-driver"
+              },
+              "AssumeRolePolicyDocument": {
+                  "Fn::Sub": [
+                      "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Principal\": {\n        \"Federated\": \"arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCURL}\"\n      },\n      \"Action\": \"sts:AssumeRoleWithWebIdentity\",\n      \"Condition\": {\n        \"StringEquals\": {\n          \"${ClusterOIDCURL}:aud\": \"sts.amazonaws.com\",\n          \"${ClusterOIDCURL}:sub\": \"system:serviceaccount:kube-system:ebs-csi-controller-sa\"\n        }\n      }\n    }\n  ]\n}\n",
+                      {
+                          "ClusterOIDCURL": {
+                              "Fn::Join": [
+                                  "",
+                                  {
+                                      "Fn::Split": [
+                                          "https://",
+                                          {
+                                              "Fn::GetAtt": [
+                                                  "EKSCluster",
+                                                  "OpenIdConnectIssuerUrl"
+                                              ]
+                                          }
+                                      ]
+                                  }
+                              ]
+                          }
+                      }
+                  ]
+              },
+              "ManagedPolicyArns": [
+                  "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+              ],
+              "Path": "/",
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "EBSCSIAddOn": {
+          "Type": "AWS::EKS::Addon",
+          "Properties": {
+              "AddonName": "aws-ebs-csi-driver",
+              "ClusterName": {
+                  "Ref": "EKSCluster"
+              },
+              "ServiceAccountRoleArn": {
+                  "Fn::GetAtt": [
+                      "EBSCSIRole",
+                      "Arn"
+                  ]
+              },
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "CoreDNSAddOn": {
+          "Type": "AWS::EKS::Addon",
+          "Properties": {
+              "AddonName": "coredns",
+              "ClusterName": {
+                  "Ref": "EKSCluster"
+              },
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      },
+      "KubeProxyAddOn": {
+          "Type": "AWS::EKS::Addon",
+          "Properties": {
+              "AddonName": "kube-proxy",
+              "ClusterName": {
+                  "Ref": "EKSCluster"
+              },
+              "Tags": [
+                  {
+                      "Key": "Environment",
+                      "Value": {
+                          "Ref": "EnvironmentName"
+                      }
+                  },
+                  {
+                      "Key": "Project",
+                      "Value": {
+                          "Ref": "ProjectName"
+                      }
+                  },
+                  {
+                      "Key": "ManagedBy",
+                      "Value": "CloudFormation"
+                  }
+              ]
+          }
+      }
+  }
+}
