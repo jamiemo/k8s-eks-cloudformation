@@ -693,7 +693,6 @@
             "Type": "AWS::EC2::LaunchTemplate",
             "Properties": {
                 "LaunchTemplateData": {
-                    "KeyName": "temp",
                     "SecurityGroupIds": [
                         {
                             "Ref": "NodeSecurityGroup"
