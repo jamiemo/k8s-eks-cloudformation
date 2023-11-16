@@ -7,12 +7,12 @@ This project creates:
 - Two private subnets contining
     - EKS nodes
 - EKS cluster
-- ECR repository
 
 There did not seem to be a complete example of deploying all required components of EKS with CloudFormation. This example includes:
 
 - OIDC Provider
 - EBS CSI Add-on and associated IAM Roles for Service Accounts (IRSA) and policy
+- EFS CSI Add-on and associated IAM Roles for Service Accounts (IRSA) and policy
 - Core DNS Add-on
 - Kube Proxy Add-on
 
@@ -28,3 +28,13 @@ Writing the AssumeRolePolicyDocument as a [Fn::Sub](https://docs.aws.amazon.com/
 [The trick is to know that the AssumeRolePolicyDocument value in a template is specified as json. As such, we can perform a !Sub on any value we pass to it, as long as the result is a valid json string.](https://bambooengineering.io/constraining-eks-pod-iam-roles-using-cloudformation/)
 
 The [ThumbprintList for the OIDCProvider is hardcoded](https://gist.github.com/riccardomc/a3891356b09516ab3f3b79a12e9b13e1), as the certificate is valid until 06/29/2034. We can get the complete [AWS::EKS::Cluster CertificateAuthorityData](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-eks-cluster.html#aws-resource-eks-cluster-return-values) but would then need to [calculate the thumbprint using OpenSSL](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc_verify-thumbprint.html) and an external process.
+
+## EFS Dynamic Provisioning
+To create a dynamically provisioned EFS persistent volume claim:
+
+- Update the fs-xxxxxxx in efs-dynamic-pvc.yaml with the deployed EFS
+- Run the following commands:
+```bash
+kubectl apply -f efs-dynamic-pvc.yaml
+kubectl get pvc
+```

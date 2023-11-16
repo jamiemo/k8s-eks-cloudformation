@@ -229,60 +229,6 @@ Resources:
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       SubnetId: !Ref PrivateSubnet2
-  NoIngressSecurityGroup:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupName: no-ingress-sg
-      GroupDescription: Security group with no ingress rule
-      VpcId: !Ref VPC
-  ContainerRepository:
-    Type: 'AWS::ECR::Repository'
-    Properties:
-      RepositoryName: !Sub '${ProjectName}-${EnvironmentName}'
-      ImageScanningConfiguration:
-        ScanOnPush: true
-      Tags:
-        - Key: Environment
-          Value: !Ref EnvironmentName
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: ManagedBy
-          Value: CloudFormation
-        - Key: ManagedBy
-          Value: CloudFormation
-  EKSIAMRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: eks.amazonaws.com
-            Action: 'sts:AssumeRole'
-      RoleName: !Sub '${ProjectName}-${EnvironmentName}'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonEKSClusterPolicy'
-        - 'arn:aws:iam::aws:policy/AmazonEKSServicePolicy'
-      Tags:
-        - Key: Environment
-          Value: !Ref EnvironmentName
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: ManagedBy
-          Value: CloudFormation
-  ControlPlaneSecurityGroup:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: Cluster communication with worker nodes
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Environment
-          Value: !Ref EnvironmentName
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: ManagedBy
-          Value: CloudFormation
   EKSCluster:
     Type: 'AWS::EKS::Cluster'
     Properties:
@@ -351,8 +297,13 @@ Resources:
   ManagedNodegroup:
     Type: 'AWS::EKS::Nodegroup'
     Properties:
+      LaunchTemplate:
+        Id: !Ref LaunchTemplate
+        Version: !GetAtt 
+          - LaunchTemplate
+          - LatestVersionNumber
       ClusterName: !Ref EKSCluster
-      NodegroupName: !Sub '${ProjectName}-${EnvironmentName}-baseload'
+      NodegroupName: !Sub '${ProjectName}-${EnvironmentName}-baseload-managed-group'
       NodeRole: !GetAtt 
         - NodeInstanceRole
         - Arn
@@ -369,6 +320,168 @@ Resources:
       Subnets:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
+  LaunchTemplate:
+    Type: 'AWS::EC2::LaunchTemplate'
+    Properties:
+      LaunchTemplateData:
+        KeyName: temp
+        SecurityGroupIds:
+          - !Ref NodeSecurityGroup
+        UserData: !Base64 
+          'Fn::Join':
+            - |+
+
+            - - 'Content-Type: multipart/mixed; boundary="//"'
+              - 'MIME-Version: 1.0'
+              - ''
+              - '--//'
+              - 'Content-Type: text/cloud-config; charset="us-ascii"'
+              - 'MIME-Version: 1.0'
+              - 'Content-Transfer-Encoding: 7bit'
+              - 'Content-Disposition: attachment; filename="cloud-config.txt"'
+              - ''
+              - '#cloud-config'
+              - 'cloud_final_modules:'
+              - '- [scripts-user, always]'
+              - ''
+              - '--//'
+              - 'Content-Type: text/x-shellscript; charset="us-ascii"'
+              - 'MIME-Version: 1.0'
+              - 'Content-Transfer-Encoding: 7bit'
+              - 'Content-Disposition: attachment; filename="userdata.txt"'
+              - ''
+              - '#!/bin/bash'
+              - '# EFS will fail to mount if this is not instaled.'
+              - yum -y install amazon-efs-utils
+              - '# User data was not in the MIME multipart format.'
+              - '# https://repost.aws/knowledge-center/execute-user-data-ec2'
+              - >-
+                #
+                https://docs.aws.amazon.com/eks/latest/userguide/launch-templates.html
+              - '--//--'
+      LaunchTemplateName: !Sub '${ProjectName}-${EnvironmentName}-launch-template'
+      TagSpecifications:
+        - ResourceType: launch-template
+          Tags:
+            - Key: Name
+              Value: !Sub '${ProjectName}-${EnvironmentName}-managed-node'
+            - Key: Environment
+              Value: !Ref EnvironmentName
+            - Key: Project
+              Value: !Ref ProjectName
+            - Key: ManagedBy
+              Value: CloudFormation
+  EKSIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      RoleName: !Sub '${ProjectName}-${EnvironmentName}'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEKSClusterPolicy'
+        - 'arn:aws:iam::aws:policy/AmazonEKSServicePolicy'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+  ControlPlaneSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub '${ProjectName}-${EnvironmentName}-eks-control-plane'
+      GroupDescription: Cluster communication with worker nodes
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+  NodeSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub '${ProjectName}-${EnvironmentName}-eks-node'
+      GroupDescription: Security group for all nodes in the cluster
+      Tags:
+        - Key: !Sub 'kubernetes.io/cluster/${ProjectName}'
+          Value: owned
+      VpcId: !Ref VPC
+  NodeSecurityGroupIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow nodes to communicate with each other
+      FromPort: 0
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: '-1'
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      ToPort: 65535
+  ClusterControlPlaneSecurityGroupIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow pods to communicate with the cluster API Server
+      FromPort: 443
+      GroupId: !Ref ControlPlaneSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      ToPort: 443
+  ControlPlaneEgressToNodeSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: >-
+        Allow the cluster control plane to communicate with worker Kubelet and
+        pods
+      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      FromPort: 1025
+      GroupId: !Ref ControlPlaneSecurityGroup
+      IpProtocol: tcp
+      ToPort: 65535
+  ControlPlaneEgressToNodeSecurityGroupOn443:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: >-
+        Allow the cluster control plane to communicate with pods running
+        extension API servers on port 443
+      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      FromPort: 443
+      GroupId: !Ref ControlPlaneSecurityGroup
+      IpProtocol: tcp
+      ToPort: 443
+  NodeSecurityGroupFromControlPlaneIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: >-
+        Allow worker Kubelets and pods to receive communication from the cluster
+        control plane
+      FromPort: 1025
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref ControlPlaneSecurityGroup
+      ToPort: 65535
+  NodeSecurityGroupFromControlPlaneOn443Ingress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: >-
+        Allow pods running extension API servers on port 443 to receive
+        communication from cluster control plane
+      FromPort: 443
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref ControlPlaneSecurityGroup
+      ToPort: 443
   EBSCSIRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -425,6 +538,114 @@ Resources:
           Value: !Ref ProjectName
         - Key: ManagedBy
           Value: CloudFormation
+  EFSCSIRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${ProjectName}-${EnvironmentName}-irsa-aws-efs-csi-driver'
+      AssumeRolePolicyDocument: !Sub 
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCURL}"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringLike": {
+                    "${ClusterOIDCURL}:aud": "sts.amazonaws.com",
+                    "${ClusterOIDCURL}:sub": "system:serviceaccount:kube-system:efs-csi-*"
+                  }
+                }
+              }
+            ]
+          }
+        - ClusterOIDCURL: !Join 
+            - ''
+            - !Split 
+              - 'https://'
+              - !GetAtt 
+                - EKSCluster
+                - OpenIdConnectIssuerUrl
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy'
+      Path: /
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+  EFSCSIAddOn:
+    Type: 'AWS::EKS::Addon'
+    Properties:
+      AddonName: aws-efs-csi-driver
+      ClusterName: !Ref EKSCluster
+      ServiceAccountRoleArn: !GetAtt 
+        - EFSCSIRole
+        - Arn
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+  EFSFileSystem:
+    Type: 'AWS::EFS::FileSystem'
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${EnvironmentName}-efs-csi'
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+  EFSMountPrivate1:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+      SubnetId: !Ref PrivateSubnet1
+  EFSMountPrivate2:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+      SubnetId: !Ref PrivateSubnet2
+  EFSSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub '${ProjectName}-${EnvironmentName}-eks-efs'
+      GroupDescription: Allow node to communicate with EFS.
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+  EFSSecurityGroupIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: EFSSecurityGroup
+    Properties:
+      Description: Allow node to communicate with EFS
+      FromPort: 2049
+      GroupId: !Ref EFSSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      ToPort: 2049
   CoreDNSAddOn:
     Type: 'AWS::EKS::Addon'
     Properties:
