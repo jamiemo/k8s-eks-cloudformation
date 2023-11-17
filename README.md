@@ -35,6 +35,7 @@ To create a dynamically provisioned EFS persistent volume claim:
 - Update the fs-xxxxxxx in efs-dynamic-pvc.yaml with the deployed EFS
 - Run the following commands:
 ```bash
+aws eks --region <region> update-kubeconfig --name <cluster name>
 kubectl apply -f efs-dynamic-pvc.yaml
 kubectl get pvc
 ```
