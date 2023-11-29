@@ -31,7 +31,7 @@ Parameters:
       A comma seperated list of CIDRs allowed access to the cluster's public
       Kubernetes API server endpoint.
     Type: String
-    Default: '0.0.0.0/0'
+    Default: 0.0.0.0/0
 Resources:
   VPC:
     Type: 'AWS::EC2::VPC'
@@ -251,6 +251,14 @@ Resources:
         PublicAccessCidrs: !Split 
           - ','
           - !Ref PublicAccessCidrs
+      Logging:
+        ClusterLogging:
+          EnabledTypes:
+            - Type: api
+            - Type: audit
+            - Type: authenticator
+            - Type: controllerManager
+            - Type: scheduler
       Tags:
         - Key: Environment
           Value: !Ref EnvironmentName
