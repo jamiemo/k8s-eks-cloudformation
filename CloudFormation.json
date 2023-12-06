@@ -537,6 +537,8 @@
                             "Ref": "PrivateSubnet2"
                         }
                     ],
+                    "EndpointPrivateAccess": true,
+                    "EndpointPublicAccess": true,
                     "PublicAccessCidrs": {
                         "Fn::Split": [
                             ",",

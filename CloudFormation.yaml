@@ -248,6 +248,8 @@ Resources:
         SubnetIds:
           - !Ref PrivateSubnet1
           - !Ref PrivateSubnet2
+        EndpointPrivateAccess: true
+        EndpointPublicAccess: true
         PublicAccessCidrs: !Split 
           - ','
           - !Ref PublicAccessCidrs
