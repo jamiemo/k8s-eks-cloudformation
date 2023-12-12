@@ -523,6 +523,21 @@
                         "Arn"
                     ]
                 },
+                "EncryptionConfig": [
+                    {
+                        "Provider": {
+                            "KeyArn": {
+                                "Fn::GetAtt": [
+                                    "EKSKMSKey",
+                                    "Arn"
+                                ]
+                            }
+                        },
+                        "Resources": [
+                            "secrets"
+                        ]
+                    }
+                ],
                 "ResourcesVpcConfig": {
                     "SecurityGroupIds": [
                         {
@@ -845,6 +860,88 @@
                         "Value": "CloudFormation"
                     }
                 ]
+            }
+        },
+        "EKSKMSKey": {
+            "Type": "AWS::KMS::Key",
+            "Properties": {
+                "Description": "EKS Secrets Encryption KMS key",
+                "EnableKeyRotation": true,
+                "PendingWindowInDays": 20,
+                "KeyPolicy": {
+                    "Version": "2012-10-17",
+                    "Id": "key-default",
+                    "Statement": [
+                        {
+                            "Sid": "Enable IAM User Permissions",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root"
+                                }
+                            },
+                            "Action": "kms:*",
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "Allow use of the key",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::GetAtt": [
+                                        "EKSIAMRole",
+                                        "Arn"
+                                    ]
+                                }
+                            },
+                            "Action": [
+                                "kms:Encrypt",
+                                "kms:Decrypt",
+                                "kms:ReEncrypt*",
+                                "kms:GenerateDataKey*",
+                                "kms:DescribeKey"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "Allow attachment of persistent resources",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::GetAtt": [
+                                        "EKSIAMRole",
+                                        "Arn"
+                                    ]
+                                }
+                            },
+                            "Action": [
+                                "kms:CreateGrant",
+                                "kms:ListGrants",
+                                "kms:RevokeGrant"
+                            ],
+                            "Resource": "*",
+                            "Condition": {
+                                "Bool": {
+                                    "kms:GrantIsForAWSResource": "true"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "EKSKMSAlias": {
+            "Type": "AWS::KMS::Alias",
+            "Properties": {
+                "AliasName": {
+                    "Fn::Sub": "alias/${ProjectName}-${EnvironmentName}-eks"
+                },
+                "TargetKeyId": {
+                    "Fn::GetAtt": [
+                        "EKSKMSKey",
+                        "Arn"
+                    ]
+                }
             }
         },
         "ControlPlaneSecurityGroup": {
