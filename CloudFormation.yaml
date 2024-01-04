@@ -748,3 +748,61 @@ Resources:
           Value: !Ref ProjectName
         - Key: ManagedBy
           Value: CloudFormation
+  VPCCNIRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${ProjectName}-${EnvironmentName}-irsa-aws-vpc-cni'
+      AssumeRolePolicyDocument: !Sub 
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCURL}"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringLike": {
+                    "${ClusterOIDCURL}:aud": "sts.amazonaws.com",
+                    "${ClusterOIDCURL}:sub": "system:serviceaccount:kube-system:aws-node"
+                  }
+                }
+              }
+            ]
+          }
+        - ClusterOIDCURL: !Join 
+            - ''
+            - !Split 
+              - 'https://'
+              - !GetAtt 
+                - EKSCluster
+                - OpenIdConnectIssuerUrl
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy'
+      Path: /
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+  VPCCNIAddOn:
+    Type: 'AWS::EKS::Addon'
+    Properties:
+      AddonName: vpc-cni
+      ClusterName: !Ref EKSCluster
+      ConfigurationValues: '{"env":{"ENABLE_PREFIX_DELEGATION":"true"}}'
+      ResolveConflicts: OVERWRITE
+      ServiceAccountRoleArn: !GetAtt 
+        - VPCCNIRole
+        - Arn
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation

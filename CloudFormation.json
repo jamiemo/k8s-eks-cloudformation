@@ -1426,6 +1426,94 @@
                     }
                 ]
             }
+        },
+        "VPCCNIRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "RoleName": {
+                    "Fn::Sub": "${ProjectName}-${EnvironmentName}-irsa-aws-vpc-cni"
+                },
+                "AssumeRolePolicyDocument": {
+                    "Fn::Sub": [
+                        "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Principal\": {\n        \"Federated\": \"arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCURL}\"\n      },\n      \"Action\": \"sts:AssumeRoleWithWebIdentity\",\n      \"Condition\": {\n        \"StringLike\": {\n          \"${ClusterOIDCURL}:aud\": \"sts.amazonaws.com\",\n          \"${ClusterOIDCURL}:sub\": \"system:serviceaccount:kube-system:aws-node\"\n        }\n      }\n    }\n  ]\n}\n",
+                        {
+                            "ClusterOIDCURL": {
+                                "Fn::Join": [
+                                    "",
+                                    {
+                                        "Fn::Split": [
+                                            "https://",
+                                            {
+                                                "Fn::GetAtt": [
+                                                    "EKSCluster",
+                                                    "OpenIdConnectIssuerUrl"
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+                ],
+                "Path": "/",
+                "Tags": [
+                    {
+                        "Key": "Environment",
+                        "Value": {
+                            "Ref": "EnvironmentName"
+                        }
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": {
+                            "Ref": "ProjectName"
+                        }
+                    },
+                    {
+                        "Key": "ManagedBy",
+                        "Value": "CloudFormation"
+                    }
+                ]
+            }
+        },
+        "VPCCNIAddOn": {
+            "Type": "AWS::EKS::Addon",
+            "Properties": {
+                "AddonName": "vpc-cni",
+                "ClusterName": {
+                    "Ref": "EKSCluster"
+                },
+                "ConfigurationValues": "{\"env\":{\"ENABLE_PREFIX_DELEGATION\":\"true\"}}",
+                "ResolveConflicts": "OVERWRITE",
+                "ServiceAccountRoleArn": {
+                    "Fn::GetAtt": [
+                        "VPCCNIRole",
+                        "Arn"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Environment",
+                        "Value": {
+                            "Ref": "EnvironmentName"
+                        }
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": {
+                            "Ref": "ProjectName"
+                        }
+                    },
+                    {
+                        "Key": "ManagedBy",
+                        "Value": "CloudFormation"
+                    }
+                ]
+            }
         }
     }
 }
