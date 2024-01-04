@@ -34,6 +34,8 @@ The [ThumbprintList for the OIDCProvider is hardcoded](https://gist.github.com/r
 
 To achieve higher pod density, the VPC CNI plugin leverages a new VPC capability that [enables IP address prefixes](https://aws.amazon.com/blogs/containers/amazon-vpc-cni-increases-pods-per-node-limits/) to be associated with elastic network interfaces (ENIs) attached to EC2 instances. Customers can now [supply their configuration directly](https://aws.amazon.com/blogs/containers/amazon-eks-add-ons-advanced-configuration/) through the Amazon EKS add-ons API, to install and configure their operational software during cluster creation in a single step. 
 
+**NOTE:** The max pods value will be set on [any newly created managed node groups, or node groups updated to a newer AMI version](https://aws.amazon.com/blogs/containers/amazon-vpc-cni-increases-pods-per-node-limits/).
+
 ## EFS Dynamic Provisioning
 To create a dynamically provisioned EFS persistent volume claim:
 
