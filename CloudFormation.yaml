@@ -350,6 +350,8 @@ Resources:
     Type: 'AWS::EC2::LaunchTemplate'
     Properties:
       LaunchTemplateData:
+        MetadataOptions:
+          HttpTokens: required
         SecurityGroupIds:
           - !Ref NodeSecurityGroup
         UserData: !Base64 

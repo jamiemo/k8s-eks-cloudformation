@@ -14,6 +14,7 @@ There did not seem to be a complete example of deploying all required components
 - EBS CSI Add-on and associated IAM Roles for Service Accounts (IRSA) and policy
 - EFS CSI Add-on and associated IAM Roles for Service Accounts (IRSA) and policy
 - Core DNS Add-on
+- IMDSv2 is [required](https://aws.amazon.com/blogs/security/get-the-full-benefits-of-imdsv2-and-disable-imdsv1-across-your-aws-infrastructure/)
 - KMS Encrypted Secrets
 - Kube Proxy Add-on
 - VPC CNI Add-on and associated IAM Roles for Service Accounts (IRSA) and policy
