@@ -17,9 +17,7 @@ There did not seem to be a complete example of deploying all required components
 - KMS Encrypted Secrets
 - Kube Proxy Add-on
 - VPC CNI Add-on and associated IAM Roles for Service Accounts (IRSA) and policy
-
-
-[When you provision a cluster, Amazon EKS installs VPC CNI automatically.](https://aws.github.io/aws-eks-best-practices/networking/vpc-cni/#deploy-vpc-cni-managed-add-on)
+- VPC CNI prefix assignment mode for increased pods per node
 
 Both JSON and YAML examples are the same deployment, and were provided to show examples of both.
 
